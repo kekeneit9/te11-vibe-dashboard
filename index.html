@@ -329,7 +329,7 @@
     </button>
 
     <script>
-        // REPLACE 'YOUR_SHEET_ID' with your actual Google Sheet ID
+        // Your actual Google Sheet ID
         const SHEET_ID = '16s1gNOukiFeb1U4t_dHZBCKKaPcTEuD7Dbm_lNMUedg';
         const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Form%20Responses%201`;
 
@@ -372,14 +372,18 @@
                 return;
             }
 
-            // Get today's responses
-            const today = new Date().toDateString();
+            // Get today's responses (more flexible date matching)
+            const today = new Date();
+            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            
             const todayResponses = currentData.filter(row => {
                 if (!row.c[0] || !row.c[0].v) return false;
-                const responseDate = new Date(row.c[0].v).toDateString();
-                return responseDate === today;
+                const responseDate = new Date(row.c[0].v);
+                console.log('Response date:', responseDate, 'Today start:', todayStart);
+                return responseDate >= todayStart;
             });
 
+            console.log(`Found ${todayResponses.length} responses for today out of ${currentData.length} total`);
             updateResponseCount(todayResponses.length);
             
             if (todayResponses.length > 0) {
@@ -388,6 +392,14 @@
                 updateResponsesList(todayResponses);
                 updateBlockersList(todayResponses);
                 updateStandupSummary(todayResponses);
+            } else {
+                console.log('No responses today, showing all responses for testing');
+                // Show all responses for testing
+                updateMoodAndEnergy(currentData);
+                updateEmojiBreakdown(currentData);
+                updateResponsesList(currentData);
+                updateBlockersList(currentData);
+                updateStandupSummary(currentData);
             }
         }
 
@@ -397,9 +409,9 @@
         }
 
         function updateMoodAndEnergy(responses) {
-            // Assuming columns: Timestamp, Email, Mood, Energy, Emoji, Blockers
-            const moods = responses.map(row => row.c[2]?.v || 0).filter(v => v > 0);
-            const energies = responses.map(row => row.c[3]?.v || 0).filter(v => v > 0);
+            // Actual columns: Timestamp, Mood, Energy, Emoji, Blockers, Email
+            const moods = responses.map(row => row.c[1]?.v || 0).filter(v => v > 0);
+            const energies = responses.map(row => row.c[2]?.v || 0).filter(v => v > 0);
             
             const avgMood = moods.length ? (moods.reduce((a, b) => a + b, 0) / moods.length).toFixed(1) : '--';
             const avgEnergy = energies.length ? (energies.reduce((a, b) => a + b, 0) / energies.length).toFixed(1) : '--';
@@ -425,7 +437,7 @@
             };
 
             responses.forEach(row => {
-                const emoji = row.c[4]?.v || '';
+                const emoji = row.c[3]?.v || '';
                 if (emoji.includes('😭')) emojiCounts.struggling++;
                 else if (emoji.includes('😐')) emojiCounts.surviving++;
                 else if (emoji.includes('😎')) emojiCounts.chillin++;
@@ -445,10 +457,10 @@
             container.innerHTML = '';
 
             responses.forEach(row => {
-                const email = row.c[1]?.v || 'Anonymous';
-                const mood = row.c[2]?.v || 0;
-                const energy = row.c[3]?.v || 0;
-                const emoji = row.c[4]?.v || '😐';
+                const email = row.c[5]?.v || 'Anonymous';
+                const mood = row.c[1]?.v || 0;
+                const energy = row.c[2]?.v || 0;
+                const emoji = row.c[3]?.v || '😐';
                 
                 const name = email.split('@')[0]; // Get name part of email
                 
@@ -470,7 +482,7 @@
             container.innerHTML = '';
 
             const blockers = responses
-                .map(row => row.c[5]?.v)
+                .map(row => row.c[4]?.v)
                 .filter(blocker => blocker && blocker.trim().length > 0);
 
             if (blockers.length === 0) {
@@ -485,9 +497,9 @@
         }
 
         function updateStandupSummary(responses) {
-            const avgMood = responses.reduce((sum, row) => sum + (row.c[2]?.v || 0), 0) / responses.length;
-            const avgEnergy = responses.reduce((sum, row) => sum + (row.c[3]?.v || 0), 0) / responses.length;
-            const blockersCount = responses.filter(row => row.c[5]?.v && row.c[5].v.trim().length > 0).length;
+            const avgMood = responses.reduce((sum, row) => sum + (row.c[1]?.v || 0), 0) / responses.length;
+            const avgEnergy = responses.reduce((sum, row) => sum + (row.c[2]?.v || 0), 0) / responses.length;
+            const blockersCount = responses.filter(row => row.c[4]?.v && row.c[4].v.trim().length > 0).length;
             
             let summary = `<p><strong>Team Status:</strong> `;
             
