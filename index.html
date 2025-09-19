@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Vibe Check Dashboard ✨</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.2rem;
+        }
+
+        .mood-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .mood-score {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .mood-emoji {
+            font-size: 2.5rem;
+        }
+
+        .traffic-light {
+            width: 100%;
+            height: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+            position: relative;
+        }
+
+        .traffic-light.green { background: linear-gradient(90deg, #4CAF50, #8BC34A); }
+        .traffic-light.yellow { background: linear-gradient(90deg, #FF9800, #FFC107); }
+        .traffic-light.red { background: linear-gradient(90deg, #F44336, #FF5722); }
+
+        .team-responses {
+            display: grid;
+            gap: 10px;
+        }
+
+        .response-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .response-emoji {
+            font-size: 1.5rem;
+            margin-left: 10px;
+        }
+
+        .blockers-list {
+            list-style: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .blockers-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-style: italic;
+            color: #666;
+        }
+
+        .blockers-list li:last-child {
+            border-bottom: none;
+        }
+
+        .no-blockers {
+            color: #4CAF50;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .historical-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover, .nav-btn.active {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.05);
+        }
+
+        .standup-summary {
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .standup-summary h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .emoji-breakdown {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .emoji-stat {
+            text-align: center;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 10px;
+            min-width: 60px;
+        }
+
+        .emoji-stat .emoji {
+            font-size: 1.5rem;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .emoji-stat .count {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.1);
+            background: #5a67d8;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Team Vibe Check Dashboard ✨</h1>
+            <p id="current-date">Loading...</p>
+        </div>
+
+        <div class="historical-nav">
+            <button class="nav-btn active">Today</button>
+            <button class="nav-btn">Yesterday</button>
+            <button class="nav-btn">This Week</button>
+            <button class="nav-btn">All Time</button>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Overall Team Mood -->
+            <div class="card">
+                <h3>🎯 Average Team Mood</h3>
+                <div class="mood-indicator">
+                    <div class="mood-score" id="avg-mood">--</div>
+                    <div class="mood-emoji">😎</div>
+                </div>
+                <div class="traffic-light yellow" id="mood-light"></div>
+                <p><strong>Scale:</strong> 1 (💀) to 10 (🔥)</p>
+                <p id="mood-status">Waiting for responses...</p>
+            </div>
+
+            <!-- Energy Levels -->
+            <div class="card">
+                <h3>⚡ Average Energy Level</h3>
+                <div class="mood-indicator">
+                    <div class="mood-score" id="avg-energy">--</div>
+                    <div class="mood-emoji">🔋</div>
+                </div>
+                <div class="traffic-light yellow" id="energy-light"></div>
+                <p><strong>Scale:</strong> 1 (☠️) to 10 (🚀)</p>
+                <p id="energy-status">Waiting for responses...</p>
+            </div>
+
+            <!-- Emoji Vibes Breakdown -->
+            <div class="card">
+                <h3>😊 Team Vibe Breakdown</h3>
+                <div class="emoji-breakdown" id="emoji-breakdown">
+                    <div class="emoji-stat">
+                        <span class="emoji">😭</span>
+                        <span class="count" id="count-struggling">0</span>
+                    </div>
+                    <div class="emoji-stat">
+                        <span class="emoji">😐</span>
+                        <span class="count" id="count-surviving">0</span>
+                    </div>
+                    <div class="emoji-stat">
+                        <span class="emoji">😎</span>
+                        <span class="count" id="count-chillin">0</span>
+                    </div>
+                    <div class="emoji-stat">
+                        <span class="emoji">🔥</span>
+                        <span class="count" id="count-thriving">0</span>
+                    </div>
+                    <div class="emoji-stat">
+                        <span class="emoji">🤡</span>
+                        <span class="count" id="count-chaos">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Today's Responses -->
+            <div class="card">
+                <h3>📋 Today's Responses</h3>
+                <div id="response-count">
+                    <strong>0 responses today</strong>
+                </div>
+                <div class="team-responses" id="team-responses">
+                    <p style="text-align: center; color: #666; padding: 20px;">
+                        Waiting for team responses...
+                    </p>
+                </div>
+            </div>
+
+            <!-- Current Blockers -->
+            <div class="card">
+                <h3>🚧 Current Blockers</h3>
+                <ul class="blockers-list" id="blockers-list">
+                    <li style="text-align: center; color: #666; padding: 20px;">
+                        No blockers reported yet today 🎉
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Standup Summary -->
+        <div class="standup-summary">
+            <h2>🎯 Standup Quick Summary</h2>
+            <div id="standup-summary-content">
+                <p>Waiting for today's responses to generate summary...</p>
+            </div>
+        </div>
+    </div>
+
+    <button class="refresh-btn" onclick="manualRefresh()" title="Refresh Data">
+        🔄
+    </button>
+
+    <script>
+        // REPLACE 'YOUR_SHEET_ID' with your actual Google Sheet ID
+        const SHEET_ID = '16s1gNOukiFeb1U4t_dHZBCKKaPcTEuD7Dbm_lNMUedg';
+        const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Form%20Responses%201`;
+
+        let currentData = [];
+
+        // Update current date
+        document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Fetch data from Google Sheets
+        async function fetchSheetData() {
+            try {
+                console.log('Fetching fresh data...');
+                
+                const response = await fetch(SHEET_URL);
+                const text = await response.text();
+                
+                // Clean up Google's JSON response
+                const jsonText = text.substring(47).slice(0, -2);
+                const data = JSON.parse(jsonText);
+                
+                currentData = data.table.rows || [];
+                updateDashboard();
+                
+                console.log('Data updated successfully!');
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                console.log('Make sure your Sheet ID is correct and sheet is public');
+            }
+        }
+
+        // Update dashboard with real data
+        function updateDashboard() {
+            if (currentData.length === 0) {
+                console.log('No data yet');
+                return;
+            }
+
+            // Get today's responses
+            const today = new Date().toDateString();
+            const todayResponses = currentData.filter(row => {
+                if (!row.c[0] || !row.c[0].v) return false;
+                const responseDate = new Date(row.c[0].v).toDateString();
+                return responseDate === today;
+            });
+
+            updateResponseCount(todayResponses.length);
+            
+            if (todayResponses.length > 0) {
+                updateMoodAndEnergy(todayResponses);
+                updateEmojiBreakdown(todayResponses);
+                updateResponsesList(todayResponses);
+                updateBlockersList(todayResponses);
+                updateStandupSummary(todayResponses);
+            }
+        }
+
+        function updateResponseCount(count) {
+            document.getElementById('response-count').innerHTML = 
+                `<strong>${count} response${count !== 1 ? 's' : ''} today</strong>`;
+        }
+
+        function updateMoodAndEnergy(responses) {
+            // Assuming columns: Timestamp, Email, Mood, Energy, Emoji, Blockers
+            const moods = responses.map(row => row.c[2]?.v || 0).filter(v => v > 0);
+            const energies = responses.map(row => row.c[3]?.v || 0).filter(v => v > 0);
+            
+            const avgMood = moods.length ? (moods.reduce((a, b) => a + b, 0) / moods.length).toFixed(1) : '--';
+            const avgEnergy = energies.length ? (energies.reduce((a, b) => a + b, 0) / energies.length).toFixed(1) : '--';
+
+            document.getElementById('avg-mood').textContent = avgMood;
+            document.getElementById('avg-energy').textContent = avgEnergy;
+
+            // Update traffic lights and status
+            updateTrafficLight('mood-light', parseFloat(avgMood));
+            updateTrafficLight('energy-light', parseFloat(avgEnergy));
+            
+            document.getElementById('mood-status').textContent = getMoodStatus(parseFloat(avgMood));
+            document.getElementById('energy-status').textContent = getEnergyStatus(parseFloat(avgEnergy));
+        }
+
+        function updateEmojiBreakdown(responses) {
+            const emojiCounts = {
+                struggling: 0,
+                surviving: 0,
+                chillin: 0,
+                thriving: 0,
+                chaos: 0
+            };
+
+            responses.forEach(row => {
+                const emoji = row.c[4]?.v || '';
+                if (emoji.includes('😭')) emojiCounts.struggling++;
+                else if (emoji.includes('😐')) emojiCounts.surviving++;
+                else if (emoji.includes('😎')) emojiCounts.chillin++;
+                else if (emoji.includes('🔥')) emojiCounts.thriving++;
+                else if (emoji.includes('🤡')) emojiCounts.chaos++;
+            });
+
+            document.getElementById('count-struggling').textContent = emojiCounts.struggling;
+            document.getElementById('count-surviving').textContent = emojiCounts.surviving;
+            document.getElementById('count-chillin').textContent = emojiCounts.chillin;
+            document.getElementById('count-thriving').textContent = emojiCounts.thriving;
+            document.getElementById('count-chaos').textContent = emojiCounts.chaos;
+        }
+
+        function updateResponsesList(responses) {
+            const container = document.getElementById('team-responses');
+            container.innerHTML = '';
+
+            responses.forEach(row => {
+                const email = row.c[1]?.v || 'Anonymous';
+                const mood = row.c[2]?.v || 0;
+                const energy = row.c[3]?.v || 0;
+                const emoji = row.c[4]?.v || '😐';
+                
+                const name = email.split('@')[0]; // Get name part of email
+                
+                const responseDiv = document.createElement('div');
+                responseDiv.className = 'response-item';
+                responseDiv.innerHTML = `
+                    <div>
+                        <strong>${name}</strong><br>
+                        <small>Mood: ${mood}/10 | Energy: ${energy}/10</small>
+                    </div>
+                    <div class="response-emoji">${emoji.includes('😭') ? '😭' : emoji.includes('😐') ? '😐' : emoji.includes('😎') ? '😎' : emoji.includes('🔥') ? '🔥' : '🤡'}</div>
+                `;
+                container.appendChild(responseDiv);
+            });
+        }
+
+        function updateBlockersList(responses) {
+            const container = document.getElementById('blockers-list');
+            container.innerHTML = '';
+
+            const blockers = responses
+                .map(row => row.c[5]?.v)
+                .filter(blocker => blocker && blocker.trim().length > 0);
+
+            if (blockers.length === 0) {
+                container.innerHTML = '<li class="no-blockers">No blockers reported today! 🎉</li>';
+            } else {
+                blockers.forEach(blocker => {
+                    const li = document.createElement('li');
+                    li.textContent = `"${blocker}"`;
+                    container.appendChild(li);
+                });
+            }
+        }
+
+        function updateStandupSummary(responses) {
+            const avgMood = responses.reduce((sum, row) => sum + (row.c[2]?.v || 0), 0) / responses.length;
+            const avgEnergy = responses.reduce((sum, row) => sum + (row.c[3]?.v || 0), 0) / responses.length;
+            const blockersCount = responses.filter(row => row.c[5]?.v && row.c[5].v.trim().length > 0).length;
+            
+            let summary = `<p><strong>Team Status:</strong> `;
+            
+            if (avgMood >= 7 && avgEnergy >= 7) {
+                summary += `Team is thriving! High mood (${avgMood.toFixed(1)}) and energy (${avgEnergy.toFixed(1)}).`;
+            } else if (avgMood < 5 || avgEnergy < 5) {
+                summary += `Team needs support. Low mood (${avgMood.toFixed(1)}) or energy (${avgEnergy.toFixed(1)}).`;
+            } else {
+                summary += `Team is doing okay. Mood: ${avgMood.toFixed(1)}/10, Energy: ${avgEnergy.toFixed(1)}/10.`;
+            }
+            
+            summary += `</p>`;
+            
+            if (blockersCount > 0) {
+                summary += `<p><strong>Action needed:</strong> ${blockersCount} team member${blockersCount > 1 ? 's have' : ' has'} reported blockers.</p>`;
+            } else {
+                summary += `<p><strong>Good news:</strong> No blockers reported today!</p>`;
+            }
+
+            document.getElementById('standup-summary-content').innerHTML = summary;
+        }
+
+        function updateTrafficLight(elementId, score) {
+            const element = document.getElementById(elementId);
+            element.className = 'traffic-light';
+            if (score >= 7) {
+                element.classList.add('green');
+            } else if (score >= 5) {
+                element.classList.add('yellow');
+            } else {
+                element.classList.add('red');
+            }
+        }
+
+        function getMoodStatus(score) {
+            if (score >= 8) return "Team is absolutely slaying! 🔥";
+            if (score >= 7) return "Good vibes all around ✨";
+            if (score >= 5) return "Doing okay, could be better";
+            if (score >= 3) return "Team needs some support 💙";
+            return "Emergency team meeting needed 🚨";
+        }
+
+        function getEnergyStatus(score) {
+            if (score >= 8) return "Ready to conquer the world! 🚀";
+            if (score >= 7) return "High energy, good to go!";
+            if (score >= 5) return "Moderate energy levels";
+            if (score >= 3) return "Team looking tired...";
+            return "Coffee emergency! ☕";
+        }
+
+        // Navigation functionality
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                console.log(`Switching to: ${this.textContent}`);
+                // Here you could filter data by different time periods
+            });
+        });
+
+        // Manual refresh function
+        function manualRefresh() {
+            fetchSheetData();
+        }
+
+        // Auto-refresh every 2 minutes
+        setInterval(fetchSheetData, 120000);
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', fetchSheetData);
+    </script>
+</body>
+</html>
