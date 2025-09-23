@@ -214,6 +214,13 @@
             background: #5a67d8;
         }
 
+        .no-data-message {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+
         @media (max-width: 768px) {
             .dashboard-grid {
                 grid-template-columns: 1fr;
@@ -233,10 +240,10 @@
         </div>
 
         <div class="historical-nav">
-            <button class="nav-btn active">Today</button>
-            <button class="nav-btn">Yesterday</button>
-            <button class="nav-btn">This Week</button>
-            <button class="nav-btn">All Time</button>
+            <button class="nav-btn active" data-period="today">Today</button>
+            <button class="nav-btn" data-period="yesterday">Yesterday</button>
+            <button class="nav-btn" data-period="this-week">This Week</button>
+            <button class="nav-btn" data-period="all-time">All Time</button>
         </div>
 
         <div class="dashboard-grid">
@@ -293,12 +300,12 @@
 
             <!-- Today's Responses -->
             <div class="card">
-                <h3>📋 Today's Responses</h3>
+                <h3>📋 <span id="period-label">Today's</span> Responses</h3>
                 <div id="response-count">
-                    <strong>0 responses today</strong>
+                    <strong>0 responses</strong>
                 </div>
                 <div class="team-responses" id="team-responses">
-                    <p style="text-align: center; color: #666; padding: 20px;">
+                    <p class="no-data-message">
                         Waiting for team responses...
                     </p>
                 </div>
@@ -308,8 +315,8 @@
             <div class="card">
                 <h3>🚧 Current Blockers</h3>
                 <ul class="blockers-list" id="blockers-list">
-                    <li style="text-align: center; color: #666; padding: 20px;">
-                        No blockers reported yet today 🎉
+                    <li class="no-data-message">
+                        No blockers reported 🎉
                     </li>
                 </ul>
             </div>
@@ -317,9 +324,9 @@
 
         <!-- Standup Summary -->
         <div class="standup-summary">
-            <h2>🎯 Standup Quick Summary</h2>
+            <h2>🎯 <span id="summary-period-label">Today's</span> Summary</h2>
             <div id="standup-summary-content">
-                <p>Waiting for today's responses to generate summary...</p>
+                <p>Waiting for responses to generate summary...</p>
             </div>
         </div>
     </div>
@@ -334,14 +341,69 @@
         const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Form%20Responses%201`;
 
         let currentData = [];
+        let currentPeriod = 'today';
 
-        // Update current date
-        document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+        // Helper function to get date ranges
+        function getDateRange(period) {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            
+            switch(period) {
+                case 'today':
+                    return {
+                        start: today,
+                        end: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+                    };
+                    
+                case 'yesterday':
+                    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+                    return {
+                        start: yesterday,
+                        end: today
+                    };
+                    
+                case 'this-week':
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+                    return {
+                        start: weekStart,
+                        end: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+                    };
+                    
+                case 'all-time':
+                    return {
+                        start: new Date(2020, 0, 1), // Way back
+                        end: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+                    };
+                    
+                default:
+                    return getDateRange('today');
+            }
+        }
+
+        // Update current date display
+        function updateDateDisplay() {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            
+            switch(currentPeriod) {
+                case 'today':
+                    document.getElementById('current-date').textContent = 
+                        new Date().toLocaleDateString('en-US', options);
+                    break;
+                case 'yesterday':
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    document.getElementById('current-date').textContent = 
+                        'Yesterday - ' + yesterday.toLocaleDateString('en-US', options);
+                    break;
+                case 'this-week':
+                    document.getElementById('current-date').textContent = 'This Week';
+                    break;
+                case 'all-time':
+                    document.getElementById('current-date').textContent = 'All Time Data';
+                    break;
+            }
+        }
 
         // Fetch data from Google Sheets
         async function fetchSheetData() {
@@ -365,47 +427,101 @@
             }
         }
 
-        // Update dashboard with real data
-        function updateDashboard() {
-            if (currentData.length === 0) {
-                console.log('No data yet');
-                return;
-            }
-
-            // Get today's responses (more flexible date matching)
-            const today = new Date();
-            const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        // Filter data by selected time period
+        function getFilteredData() {
+            if (currentData.length === 0) return [];
             
-            const todayResponses = currentData.filter(row => {
+            const { start, end } = getDateRange(currentPeriod);
+            
+            return currentData.filter(row => {
                 if (!row.c[0] || !row.c[0].v) return false;
-                const responseDate = new Date(row.c[0].v);
-                console.log('Response date:', responseDate, 'Today start:', todayStart);
-                return responseDate >= todayStart;
+                
+                // Handle both date objects and date strings
+                let responseDate;
+                if (typeof row.c[0].v === 'string') {
+                    responseDate = new Date(row.c[0].v);
+                } else {
+                    responseDate = new Date(row.c[0].v);
+                }
+                
+                // Check if date is valid
+                if (isNaN(responseDate.getTime())) return false;
+                
+                return responseDate >= start && responseDate < end;
             });
+        }
 
-            console.log(`Found ${todayResponses.length} responses for today out of ${currentData.length} total`);
-            updateResponseCount(todayResponses.length);
+        // Update dashboard with filtered data
+        function updateDashboard() {
+            updateDateDisplay();
             
-            if (todayResponses.length > 0) {
-                updateMoodAndEnergy(todayResponses);
-                updateEmojiBreakdown(todayResponses);
-                updateResponsesList(todayResponses);
-                updateBlockersList(todayResponses);
-                updateStandupSummary(todayResponses);
+            const filteredResponses = getFilteredData();
+            console.log(`Found ${filteredResponses.length} responses for ${currentPeriod}`);
+            
+            updateResponseCount(filteredResponses.length);
+            
+            if (filteredResponses.length > 0) {
+                updateMoodAndEnergy(filteredResponses);
+                updateEmojiBreakdown(filteredResponses);
+                updateResponsesList(filteredResponses);
+                updateBlockersList(filteredResponses);
+                updateStandupSummary(filteredResponses);
             } else {
-                console.log('No responses today, showing all responses for testing');
-                // Show all responses for testing
-                updateMoodAndEnergy(currentData);
-                updateEmojiBreakdown(currentData);
-                updateResponsesList(currentData);
-                updateBlockersList(currentData);
-                updateStandupSummary(currentData);
+                showNoDataState();
             }
+            
+            updateLabels();
+        }
+
+        function updateLabels() {
+            const periodLabels = {
+                'today': "Today's",
+                'yesterday': "Yesterday's",
+                'this-week': "This Week's",
+                'all-time': "All Time"
+            };
+            
+            document.getElementById('period-label').textContent = periodLabels[currentPeriod];
+            document.getElementById('summary-period-label').textContent = periodLabels[currentPeriod];
+        }
+
+        function showNoDataState() {
+            document.getElementById('avg-mood').textContent = '--';
+            document.getElementById('avg-energy').textContent = '--';
+            document.getElementById('mood-status').textContent = 'No responses for this period';
+            document.getElementById('energy-status').textContent = 'No responses for this period';
+            
+            // Reset emoji counts
+            document.getElementById('count-struggling').textContent = '0';
+            document.getElementById('count-surviving').textContent = '0';
+            document.getElementById('count-chillin').textContent = '0';
+            document.getElementById('count-thriving').textContent = '0';
+            document.getElementById('count-chaos').textContent = '0';
+            
+            // Clear responses list
+            document.getElementById('team-responses').innerHTML = 
+                '<p class="no-data-message">No responses for this time period 📭</p>';
+            
+            // Clear blockers
+            document.getElementById('blockers-list').innerHTML = 
+                '<li class="no-data-message">No data for this period</li>';
+            
+            // Clear summary
+            document.getElementById('standup-summary-content').innerHTML = 
+                '<p>No responses to summarize for this period.</p>';
+            
+            // Reset traffic lights
+            document.getElementById('mood-light').className = 'traffic-light yellow';
+            document.getElementById('energy-light').className = 'traffic-light yellow';
         }
 
         function updateResponseCount(count) {
+            const periodText = currentPeriod === 'today' ? 'today' : 
+                              currentPeriod === 'yesterday' ? 'yesterday' :
+                              currentPeriod === 'this-week' ? 'this week' : 'total';
+                              
             document.getElementById('response-count').innerHTML = 
-                `<strong>${count} response${count !== 1 ? 's' : ''} today</strong>`;
+                `<strong>${count} response${count !== 1 ? 's' : ''} ${periodText}</strong>`;
         }
 
         function updateMoodAndEnergy(responses) {
@@ -461,6 +577,7 @@
                 const mood = row.c[1]?.v || 0;
                 const energy = row.c[2]?.v || 0;
                 const emoji = row.c[3]?.v || '😐';
+                const timestamp = row.c[0]?.v ? new Date(row.c[0].v).toLocaleDateString() : 'Unknown date';
                 
                 const name = email.split('@')[0]; // Get name part of email
                 
@@ -469,7 +586,8 @@
                 responseDiv.innerHTML = `
                     <div>
                         <strong>${name}</strong><br>
-                        <small>Mood: ${mood}/10 | Energy: ${energy}/10</small>
+                        <small>Mood: ${mood}/10 | Energy: ${energy}/10</small><br>
+                        ${currentPeriod !== 'today' ? `<small style="color: #999;">${timestamp}</small>` : ''}
                     </div>
                     <div class="response-emoji">${emoji.includes('😭') ? '😭' : emoji.includes('😐') ? '😐' : emoji.includes('😎') ? '😎' : emoji.includes('🔥') ? '🔥' : '🤡'}</div>
                 `;
@@ -482,21 +600,35 @@
             container.innerHTML = '';
 
             const blockers = responses
-                .map(row => row.c[4]?.v)
-                .filter(blocker => blocker && blocker.trim().length > 0);
+                .map(row => ({
+                    blocker: row.c[4]?.v,
+                    email: row.c[5]?.v || 'Anonymous',
+                    timestamp: row.c[0]?.v ? new Date(row.c[0].v).toLocaleDateString() : 'Unknown date'
+                }))
+                .filter(item => item.blocker && item.blocker.trim().length > 0);
 
             if (blockers.length === 0) {
-                container.innerHTML = '<li class="no-blockers">No blockers reported today! 🎉</li>';
+                container.innerHTML = '<li class="no-blockers">No blockers reported! 🎉</li>';
             } else {
-                blockers.forEach(blocker => {
+                blockers.forEach(item => {
+                    const name = item.email.split('@')[0];
                     const li = document.createElement('li');
-                    li.textContent = `"${blocker}"`;
+                    li.innerHTML = `
+                        "${item.blocker}" 
+                        <small style="color: #999;">- ${name} ${currentPeriod !== 'today' ? `(${item.timestamp})` : ''}</small>
+                    `;
                     container.appendChild(li);
                 });
             }
         }
 
         function updateStandupSummary(responses) {
+            if (responses.length === 0) {
+                document.getElementById('standup-summary-content').innerHTML = 
+                    '<p>No responses to summarize for this period.</p>';
+                return;
+            }
+
             const avgMood = responses.reduce((sum, row) => sum + (row.c[1]?.v || 0), 0) / responses.length;
             const avgEnergy = responses.reduce((sum, row) => sum + (row.c[2]?.v || 0), 0) / responses.length;
             const blockersCount = responses.filter(row => row.c[4]?.v && row.c[4].v.trim().length > 0).length;
@@ -516,8 +648,10 @@
             if (blockersCount > 0) {
                 summary += `<p><strong>Action needed:</strong> ${blockersCount} team member${blockersCount > 1 ? 's have' : ' has'} reported blockers.</p>`;
             } else {
-                summary += `<p><strong>Good news:</strong> No blockers reported today!</p>`;
+                summary += `<p><strong>Good news:</strong> No blockers reported!</p>`;
             }
+
+            summary += `<p><strong>Responses:</strong> ${responses.length} team member${responses.length > 1 ? 's' : ''} responded.</p>`;
 
             document.getElementById('standup-summary-content').innerHTML = summary;
         }
@@ -529,12 +663,15 @@
                 element.classList.add('green');
             } else if (score >= 5) {
                 element.classList.add('yellow');
-            } else {
+            } else if (score > 0) {
                 element.classList.add('red');
+            } else {
+                element.classList.add('yellow');
             }
         }
 
         function getMoodStatus(score) {
+            if (isNaN(score)) return "Waiting for responses...";
             if (score >= 8) return "Team is absolutely slaying! 🔥";
             if (score >= 7) return "Good vibes all around ✨";
             if (score >= 5) return "Doing okay, could be better";
@@ -543,6 +680,7 @@
         }
 
         function getEnergyStatus(score) {
+            if (isNaN(score)) return "Waiting for responses...";
             if (score >= 8) return "Ready to conquer the world! 🚀";
             if (score >= 7) return "High energy, good to go!";
             if (score >= 5) return "Moderate energy levels";
@@ -556,8 +694,9 @@
                 document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 
-                console.log(`Switching to: ${this.textContent}`);
-                // Here you could filter data by different time periods
+                currentPeriod = this.getAttribute('data-period');
+                console.log(`Switching to: ${currentPeriod}`);
+                updateDashboard();
             });
         });
 
@@ -570,7 +709,10 @@
         setInterval(fetchSheetData, 120000);
 
         // Load data when page loads
-        document.addEventListener('DOMContentLoaded', fetchSheetData);
+        document.addEventListener('DOMContentLoaded', () => {
+            updateDateDisplay();
+            fetchSheetData();
+        });
     </script>
 </body>
 </html>
