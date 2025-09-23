@@ -436,17 +436,33 @@
             return currentData.filter(row => {
                 if (!row.c[0] || !row.c[0].v) return false;
                 
-                // Handle both date objects and date strings
+                // Handle different date formats from Google Sheets
                 let responseDate;
-                if (typeof row.c[0].v === 'string') {
-                    responseDate = new Date(row.c[0].v);
+                const dateValue = row.c[0].v;
+                
+                if (typeof dateValue === 'string') {
+                    // Handle DD/MM/YYYY HH:MM:SS format
+                    if (dateValue.includes('/')) {
+                        const [datePart, timePart] = dateValue.split(' ');
+                        const [day, month, year] = datePart.split('/');
+                        const time = timePart || '00:00:00';
+                        // Convert to ISO format: YYYY-MM-DD HH:MM:SS
+                        const isoFormat = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${time}`;
+                        responseDate = new Date(isoFormat);
+                    } else {
+                        responseDate = new Date(dateValue);
+                    }
                 } else {
-                    responseDate = new Date(row.c[0].v);
+                    responseDate = new Date(dateValue);
                 }
                 
                 // Check if date is valid
-                if (isNaN(responseDate.getTime())) return false;
+                if (isNaN(responseDate.getTime())) {
+                    console.log('Invalid date:', dateValue);
+                    return false;
+                }
                 
+                console.log('Checking date:', responseDate, 'against range:', start, 'to', end);
                 return responseDate >= start && responseDate < end;
             });
         }
@@ -577,7 +593,20 @@
                 const mood = row.c[1]?.v || 0;
                 const energy = row.c[2]?.v || 0;
                 const emoji = row.c[3]?.v || '😐';
-                const timestamp = row.c[0]?.v ? new Date(row.c[0].v).toLocaleDateString() : 'Unknown date';
+                
+                // Better date formatting
+                let timestamp = 'Unknown date';
+                if (row.c[0]?.v) {
+                    const dateValue = row.c[0].v;
+                    if (typeof dateValue === 'string' && dateValue.includes('/')) {
+                        const [datePart, timePart] = dateValue.split(' ');
+                        const [day, month, year] = datePart.split('/');
+                        const time = timePart || '';
+                        timestamp = `${day}/${month}/${year}${time ? ` ${time.substring(0, 5)}` : ''}`;
+                    } else {
+                        timestamp = new Date(dateValue).toLocaleDateString();
+                    }
+                }
                 
                 const name = email.split('@')[0]; // Get name part of email
                 
@@ -600,11 +629,26 @@
             container.innerHTML = '';
 
             const blockers = responses
-                .map(row => ({
-                    blocker: row.c[4]?.v,
-                    email: row.c[5]?.v || 'Anonymous',
-                    timestamp: row.c[0]?.v ? new Date(row.c[0].v).toLocaleDateString() : 'Unknown date'
-                }))
+                .map(row => {
+                    // Better date formatting for blockers too
+                    let timestamp = 'Unknown date';
+                    if (row.c[0]?.v) {
+                        const dateValue = row.c[0].v;
+                        if (typeof dateValue === 'string' && dateValue.includes('/')) {
+                            const [datePart] = dateValue.split(' ');
+                            const [day, month, year] = datePart.split('/');
+                            timestamp = `${day}/${month}/${year}`;
+                        } else {
+                            timestamp = new Date(dateValue).toLocaleDateString();
+                        }
+                    }
+                    
+                    return {
+                        blocker: row.c[4]?.v,
+                        email: row.c[5]?.v || 'Anonymous',
+                        timestamp: timestamp
+                    };
+                })
                 .filter(item => item.blocker && item.blocker.trim().length > 0);
 
             if (blockers.length === 0) {
