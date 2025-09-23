@@ -418,27 +418,60 @@
                 const data = JSON.parse(jsonText);
                 
                 currentData = data.table.rows || [];
+                
+                // DEBUG: Log the raw data structure
+                console.log('Raw data structure:', data);
+                console.log('Number of rows:', currentData.length);
+                console.log('First few rows:', currentData.slice(0, 3));
+                
+                // DEBUG: Log what we think the data looks like
+                currentData.forEach((row, index) => {
+                    if (index < 5) { // Only log first 5 rows
+                        console.log(`Row ${index}:`, {
+                            timestamp: row.c[0]?.v,
+                            mood: row.c[1]?.v,
+                            energy: row.c[2]?.v,
+                            emoji: row.c[3]?.v,
+                            blocker: row.c[4]?.v,
+                            email: row.c[5]?.v
+                        });
+                    }
+                });
+                
                 updateDashboard();
                 
                 console.log('Data updated successfully!');
             } catch (error) {
                 console.error('Error fetching data:', error);
                 console.log('Make sure your Sheet ID is correct and sheet is public');
+                
+                // Show error state in UI
+                document.getElementById('standup-summary-content').innerHTML = 
+                    '<p style="color: red;">Error loading data. Check console for details.</p>';
             }
         }
 
         // Filter data by selected time period
         function getFilteredData() {
-            if (currentData.length === 0) return [];
+            if (currentData.length === 0) {
+                console.log('No data available to filter');
+                return [];
+            }
             
+            console.log(`Filtering for period: ${currentPeriod}`);
             const { start, end } = getDateRange(currentPeriod);
+            console.log(`Date range: ${start} to ${end}`);
             
-            return currentData.filter(row => {
-                if (!row.c[0] || !row.c[0].v) return false;
+            const filtered = currentData.filter(row => {
+                if (!row.c || !row.c[0] || !row.c[0].v) {
+                    console.log('Row has no timestamp data:', row);
+                    return false;
+                }
                 
                 // Handle different date formats from Google Sheets
                 let responseDate;
                 const dateValue = row.c[0].v;
+                console.log('Processing date value:', dateValue, typeof dateValue);
                 
                 if (typeof dateValue === 'string') {
                     // Handle DD/MM/YYYY HH:MM:SS format
@@ -449,22 +482,33 @@
                         // Convert to ISO format: YYYY-MM-DD HH:MM:SS
                         const isoFormat = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${time}`;
                         responseDate = new Date(isoFormat);
+                        console.log(`Converted ${dateValue} to ${responseDate}`);
                     } else {
                         responseDate = new Date(dateValue);
+                        console.log(`Direct conversion: ${dateValue} to ${responseDate}`);
                     }
+                } else if (typeof dateValue === 'object' && dateValue.hasOwnProperty('v')) {
+                    // Sometimes Google Sheets returns nested objects
+                    responseDate = new Date(dateValue.v);
+                    console.log(`Nested object conversion: ${dateValue.v} to ${responseDate}`);
                 } else {
                     responseDate = new Date(dateValue);
+                    console.log(`Default conversion: ${dateValue} to ${responseDate}`);
                 }
                 
                 // Check if date is valid
                 if (isNaN(responseDate.getTime())) {
-                    console.log('Invalid date:', dateValue);
+                    console.log('Invalid date:', dateValue, responseDate);
                     return false;
                 }
                 
-                console.log('Checking date:', responseDate, 'against range:', start, 'to', end);
-                return responseDate >= start && responseDate < end;
+                const inRange = responseDate >= start && responseDate < end;
+                console.log(`Date ${responseDate} in range ${start} to ${end}? ${inRange}`);
+                return inRange;
             });
+            
+            console.log(`Filtered ${filtered.length} rows out of ${currentData.length} total`);
+            return filtered;
         }
 
         // Update dashboard with filtered data
