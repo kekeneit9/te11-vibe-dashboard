@@ -1,36 +1,4 @@
-function updateResponsesList(responses) {
-            const container = document.getElementById('team-responses');
-            container.innerHTML = '';
-
-            responses.forEach(row => {
-                const email = row.c[5]?.v || 'Anonymous';
-                const mood = row.c[1]?.v || 0;
-                const energy = row.c[2]?.v || 0;
-                const emoji = row.c[3]?.v || '😐';
-                
-                // Better date formatting for Google Sheets Date() format
-                let timestamp = 'Unknown date';
-                if (row.c[0]?.v) {
-                    const dateValue = row.c[0].v;
-                    if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
-                        try {
-                            // Parse Date(2025,8,19,12,22,41) format
-                            const dateStr = dateValue.slice(5, -1);
-                            const parts = dateStr.split(',').map(num => parseInt(num.trim()));
-                            if (parts.length >= 3) {
-                                const year = parts[0];
-                                const month = parts[1]; // 0-indexed
-                                const day = parts[2];
-                                const hour = parts[3] || 0;
-                                const minute = parts[4] || 0;
-                                
-                                const date = new Date(year, month, day, hour, minute);
-                                timestamp = date.toLocaleDateString() + (hour || minute ? ` ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}` : '');
-                            }
-                        } catch (e) {
-                            timestamp = 'Invalid date';
-                        }
-                    } else if (typeof dateValue === <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -695,17 +663,38 @@ function updateResponsesList(responses) {
                 const energy = row.c[2]?.v || 0;
                 const emoji = row.c[3]?.v || '😐';
                 
-                // Better date formatting
+                // Better date formatting for Google Sheets Date() format
                 let timestamp = 'Unknown date';
                 if (row.c[0]?.v) {
                     const dateValue = row.c[0].v;
-                    if (typeof dateValue === 'string' && dateValue.includes('/')) {
+                    if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
+                        try {
+                            // Parse Date(2025,8,19,12,22,41) format
+                            const dateStr = dateValue.slice(5, -1);
+                            const parts = dateStr.split(',').map(num => parseInt(num.trim()));
+                            if (parts.length >= 3) {
+                                const year = parts[0];
+                                const month = parts[1]; // 0-indexed
+                                const day = parts[2];
+                                const hour = parts[3] || 0;
+                                const minute = parts[4] || 0;
+                                
+                                const date = new Date(year, month, day, hour, minute);
+                                timestamp = date.toLocaleDateString() + (hour || minute ? ` ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}` : '');
+                            }
+                        } catch (e) {
+                            timestamp = 'Invalid date';
+                        }
+                    } else if (typeof dateValue === 'string' && dateValue.includes('/')) {
                         const [datePart, timePart] = dateValue.split(' ');
-                        const [day, month, year] = datePart.split('/');
-                        const time = timePart || '';
-                        timestamp = `${day}/${month}/${year}${time ? ` ${time.substring(0, 5)}` : ''}`;
+                        const time = timePart ? timePart.substring(0, 5) : '';
+                        timestamp = `${datePart}${time ? ` ${time}` : ''}`;
                     } else {
-                        timestamp = new Date(dateValue).toLocaleDateString();
+                        try {
+                            timestamp = new Date(dateValue).toLocaleDateString();
+                        } catch (e) {
+                            timestamp = 'Unknown date';
+                        }
                     }
                 }
                 
