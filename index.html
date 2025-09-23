@@ -1,4 +1,36 @@
-<!DOCTYPE html>
+function updateResponsesList(responses) {
+            const container = document.getElementById('team-responses');
+            container.innerHTML = '';
+
+            responses.forEach(row => {
+                const email = row.c[5]?.v || 'Anonymous';
+                const mood = row.c[1]?.v || 0;
+                const energy = row.c[2]?.v || 0;
+                const emoji = row.c[3]?.v || '😐';
+                
+                // Better date formatting for Google Sheets Date() format
+                let timestamp = 'Unknown date';
+                if (row.c[0]?.v) {
+                    const dateValue = row.c[0].v;
+                    if (typeof dateValue === 'string' && dateValue.startsWith('Date(')) {
+                        try {
+                            // Parse Date(2025,8,19,12,22,41) format
+                            const dateStr = dateValue.slice(5, -1);
+                            const parts = dateStr.split(',').map(num => parseInt(num.trim()));
+                            if (parts.length >= 3) {
+                                const year = parts[0];
+                                const month = parts[1]; // 0-indexed
+                                const day = parts[2];
+                                const hour = parts[3] || 0;
+                                const minute = parts[4] || 0;
+                                
+                                const date = new Date(year, month, day, hour, minute);
+                                timestamp = date.toLocaleDateString() + (hour || minute ? ` ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')}` : '');
+                            }
+                        } catch (e) {
+                            timestamp = 'Invalid date';
+                        }
+                    } else if (typeof dateValue === <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -468,21 +500,46 @@
                     return false;
                 }
                 
-                // Handle different date formats from Google Sheets
+                // Handle Google Sheets date format
                 let responseDate;
                 const dateValue = row.c[0].v;
                 console.log('Processing date value:', dateValue, typeof dateValue);
                 
                 if (typeof dateValue === 'string') {
+                    // Handle Google Sheets Date(YYYY,M,D,H,M,S) format
+                    if (dateValue.startsWith('Date(') && dateValue.endsWith(')')) {
+                        try {
+                            // Extract the numbers from Date(2025,8,19,12,22,41)
+                            const dateStr = dateValue.slice(5, -1); // Remove "Date(" and ")"
+                            const parts = dateStr.split(',').map(num => parseInt(num.trim()));
+                            
+                            if (parts.length >= 3) {
+                                // parts[0] = year, parts[1] = month (0-indexed), parts[2] = day
+                                // parts[3] = hour, parts[4] = minute, parts[5] = second
+                                const year = parts[0];
+                                const month = parts[1]; // Already 0-indexed in Google's format
+                                const day = parts[2];
+                                const hour = parts[3] || 0;
+                                const minute = parts[4] || 0;
+                                const second = parts[5] || 0;
+                                
+                                responseDate = new Date(year, month, day, hour, minute, second);
+                                console.log(`Converted Google date ${dateValue} to ${responseDate}`);
+                            }
+                        } catch (e) {
+                            console.log('Error parsing Google date format:', e);
+                            responseDate = new Date(dateValue);
+                        }
+                    }
                     // Handle DD/MM/YYYY HH:MM:SS format
-                    if (dateValue.includes('/')) {
+                    else if (dateValue.includes('/')) {
                         const [datePart, timePart] = dateValue.split(' ');
                         const [day, month, year] = datePart.split('/');
                         const time = timePart || '00:00:00';
                         // Convert to ISO format: YYYY-MM-DD HH:MM:SS
                         const isoFormat = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${time}`;
                         responseDate = new Date(isoFormat);
-                        console.log(`Converted ${dateValue} to ${responseDate}`);
+                        console.log(`Converted DD/MM/YYYY ${dateValue} to ${responseDate}`);
                     } else {
                         responseDate = new Date(dateValue);
                         console.log(`Direct conversion: ${dateValue} to ${responseDate}`);
